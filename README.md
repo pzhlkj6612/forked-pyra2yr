@@ -23,7 +23,7 @@ Multi-game test environments are created with docker and require Docker Compose.
 docker compose build
 ```
 
-Download and extract [ra2yrcpp](https://github.com/shmocz/ra2yrcpp/releases/download/latest/ra2yrcpp.zip) to CnCNet data folder. Patch `gamemd-spawn.exe` according to [instructions](https://github.com/shmocz/ra2yrcpp#usage).
+Download and extract [ra2yrcpp](https://github.com/shmocz/ra2yrcpp/releases/download/latest/ra2yrcpp.zip) to game data folder. Patch `gamemd-spawn.exe` according to [instructions](https://github.com/shmocz/ra2yrcpp#usage) if you are not using Syringe.
 
 ## Usage
 
@@ -51,3 +51,5 @@ For example:
 ```bash
 USE_SYRINGE=y USE_X11=y python -m unittest
 ```
+
+Don't forget to modify `game_data_directory` in "pyra2yr/test_util.py" if your game data folder is not "../ra2yrcpp/maingame".
