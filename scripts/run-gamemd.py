@@ -54,6 +54,7 @@ Syringe.exe
 cncnet.fnt
 cncnet5.dll
 CnCNet-Spawner.dll
+cncnet.mix
 gamemd.exe
 {NAME_SPAWNER}\
 """
