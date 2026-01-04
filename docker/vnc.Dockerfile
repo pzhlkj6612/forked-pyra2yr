@@ -1,4 +1,4 @@
-FROM alpine:latest as src
+FROM alpine:latest AS src
 RUN apk add --no-cache \
 	bash \
 	git \

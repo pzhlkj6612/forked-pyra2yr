@@ -1,4 +1,4 @@
-FROM ubuntu:latest as pyra2yr
+FROM ubuntu:latest AS pyra2yr
 
 RUN dpkg --add-architecture i386
 
