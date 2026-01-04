@@ -1,7 +1,13 @@
 *
-!*/
-!.gitignore
+!/.github/**
+!/docker/**
 !/pyra2yr/**
+!/scripts/**
+!.gitignore
+!.pylintrc
+!build.sh
+!docker-compose.yml
+!LICENSE
+!pyproject.toml
 !README.md
-!data/*
 *__pycache__*
