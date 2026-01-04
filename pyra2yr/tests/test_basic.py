@@ -1,4 +1,5 @@
 import asyncio
+import random
 from pyra2yr.test_util import BaseGameTest
 
 
@@ -18,9 +19,9 @@ class BasicTest(BaseGameTest):
             for M in self.managers:
                 tg.create_task(M.deploy_mcv())
 
-        # FIXME: yrpp-spawner freezes at game exit if this is used
-        for M in self.managers:
-            await M.sell_all_buildings()
+        # yrpp-spawner freezes at game exit if two competitors surrender simultaneously.
+        M = random.choice(self.managers)
+        await M.sell_all_buildings()
 
     async def test_basic_build(self):
         async with asyncio.TaskGroup() as tg:
@@ -51,6 +52,6 @@ class BasicTest(BaseGameTest):
                     # FIXME: Small delay to avoid buggy dupe event check for DoList
                     await asyncio.sleep(0.5)
 
-        # FIXME: yrpp-spawner freezes at game exit if this is used
-        for M in self.managers:
-            await M.sell_all_buildings()
+        # yrpp-spawner freezes at game exit if two competitors surrender simultaneously.
+        M = random.choice(self.managers)
+        await M.sell_all_buildings()
