@@ -367,6 +367,8 @@ class GameInstance:
                 self.map_path,
                 "\n\n".join([m] + [read_file(p) for p in self.mcfg.ini_overrides]),
             )
+        else:
+            write_file(self.map_path, m)
 
     def generate_spawn_ini(self):
         write_file(self.spawn_path, self.mcfg.to_ini(self.player_index))
