@@ -22,7 +22,7 @@ class Docker:
         volumes=None,
     ):
         r = cls._common(compose_files=compose_files)
-        r.extend(["run", "--rm", "-T"])
+        r.extend(["run", "--rm", "-T", "--pull", "never"])
         if uid:
             r.extend(["-u", f"{uid}:{uid}"])
         if env:
@@ -53,7 +53,7 @@ class Docker:
     @classmethod
     def up(cls, services, compose_files=None):
         r = cls._common(compose_files)
-        r.extend(["up", "--wait"])
+        r.extend(["up", "--wait", "--pull", "never"])
         r.extend(services)
         return r
 
