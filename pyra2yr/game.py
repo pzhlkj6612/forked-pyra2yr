@@ -64,26 +64,100 @@ def get_compose_dict(
     novnc_port: int = 6081,
     tunnel_port: int = 50000,
     x11_socket: Path = None,
-) -> str:
+    separate_vnc_desktop: bool = False,
+) -> dict:
+    """Generate docker-compose dict for game instances.
+
+    Parameters
+    ----------
+    ws_ports : list[int]
+        WebSocket ports for each player; represents the number of players
+    container_image : str
+        Docker image for game containers
+    vnc_port : int
+        Base VNC port (5901 for display :1)
+    novnc_port : int
+        Base noVNC web port (6081 for 1st display)
+    tunnel_port : int
+        CnCNet tunnel port (50000 by default)
+    separate_vnc_desktop : bool
+        If True, create separate VNC session per player (False by default).
+        Only applies when using VNC (x11_socket is None)
+    x11_socket : Path
+        Path to X11 socket for direct display passthrough (no VNC)
+
+    Returns
+    -------
+    dict
+        Services list for docker-compose.
+    """
     ports = [tunnel_port] + ws_ports
     use_vnc = x11_socket is None
+    services = []
+    game_deps = []
+    game_volumes = [".:/home/user/project"]
+    game_ipc = None
+
+    if x11_socket is not None and not x11_socket.exists():
+        raise RuntimeError(f"X11 socket path doesn't exist: {x11_socket}")
+
+    if x11_socket is not None:
+        game_volumes.append(f"{x11_socket}:/tmp/{x11_socket.name}:rw")
+        game_ipc = "host"
 
     if use_vnc:
-        ports.extend([novnc_port, vnc_port])
-    if not use_vnc and not x11_socket.exists():
-        raise RuntimeError(f"Socket path doesn't exist: {x11_socket}")
+        for i in range(len(ws_ports) if separate_vnc_desktop else 1):
+            vnc_name = f"vnc-{i}"
+            novnc_name = f"novnc-{i}"
+            vm_name = f"wm-{i}"
+
+            display_num = i + 1  # :1, :2, ...
+            player_vnc_port = vnc_port + i
+            player_novnc_port = novnc_port + i
+
+            ports.extend([player_vnc_port, player_novnc_port])
+
+            game_deps.append(vm_name)
+
+            services.extend([
+                ComposeService(
+                    vnc_name,
+                    "shmocz/vnc:latest",
+                    command=(
+                        f"sh -c 'Xvnc :{display_num} -depth 24 -geometry $$RESOLUTION -br "
+                        f"-rfbport={player_vnc_port} "
+                        "-SecurityTypes None -AcceptSetDesktopSize=off'"
+                    ),
+                    network_mode="service:tunnel",
+                    environment={"RESOLUTION": "1280x1024"},
+                ),
+                ComposeService(
+                    novnc_name,
+                    "shmocz/vnc:latest",
+                    command=(
+                        "/noVNC/utils/novnc_proxy --vnc "
+                        f"localhost:{player_vnc_port} --listen {player_novnc_port}"
+                    ),
+                    depends_on=[vnc_name],
+                    network_mode="service:tunnel",
+                    user="root",
+                ),
+                ComposeService(
+                    vm_name,
+                    "shmocz/vnc:latest",
+                    command="sh -c 'exec openbox-session'",
+                    network_mode="service:tunnel",
+                    depends_on=[vnc_name],
+                    environment={"DISPLAY": f":{display_num}"},
+                ),
+            ])
+
     if len(set(ports)) != len(ports) or any(p < 1 for p in ports):
         raise RuntimeError(
             f"All ports must be unique and positive numbers. Got: {ports}"
         )
 
-    game_ipc = None if use_vnc else "host"
-    game_volumes = [".:/home/user/project"]
-    game_deps = ["wm"] if use_vnc else []
-    if not use_vnc:
-        game_volumes.append(f"{x11_socket}:/tmp/{x11_socket.name}:rw")
-
-    base_services = [
+    services.extend([
         ComposeService(
             "tunnel",
             "shmocz/pycncnettunnel:latest",
@@ -102,42 +176,10 @@ def get_compose_dict(
             environment={"DISPLAY": ":1"},
             ipc=game_ipc,
         ),
-    ]
-    vnc_services = [
-        ComposeService(
-            "vnc",
-            "shmocz/vnc:latest",
-            command=(
-                "sh -c 'Xvnc :1 -depth 24 -geometry $$RESOLUTION -br "
-                f"-rfbport={vnc_port} "
-                "-SecurityTypes None -AcceptSetDesktopSize=off'"
-            ),
-            network_mode="service:tunnel",
-            environment={"RESOLUTION": "1280x1024"},
-        ),
-        ComposeService(
-            "novnc",
-            "shmocz/vnc:latest",
-            command=(
-                "/noVNC/utils/novnc_proxy --vnc "
-                f"localhost:{vnc_port} --listen {novnc_port}"
-            ),
-            depends_on=["vnc"],
-            network_mode="service:tunnel",
-            user="root",
-        ),
-        ComposeService(
-            "wm",
-            "shmocz/vnc:latest",
-            command="sh -c 'exec openbox-session'",
-            network_mode="service:tunnel",
-            depends_on=["vnc"],
-            environment={"DISPLAY": ":1"},
-        ),
-    ]
+    ])
 
     D = {"services": {}}
-    for x in base_services + (vnc_services if use_vnc else []):
+    for x in services:
         D["services"].update(x.to_dict())
 
     return D
@@ -226,6 +268,7 @@ class MultiGameInstanceConfig:
     tunnel_port: int = 50000
     use_syringe: bool = False
     x11_socket: Path = None
+    separate_vnc_desktop: bool = False
 
     def __post_init__(self):
         for k in ["color", "location", "name"]:
@@ -404,12 +447,19 @@ class GameInstance:
         ]
         if self.mcfg.use_syringe:
             cmd.append("--syringe")
+
+        # Use separate display per player if configured
+        if self.mcfg.separate_vnc_desktop:
+            display_num = self.player_index + 1  # :1, :2, :3, ...
+        else:
+            display_num = 1
+
         cmd_full = Docker.run(
             cmd,
             service="game",
             name=self._container_name,
             env=[
-                ("DISPLAY", ":1"),
+                ("DISPLAY", f":{display_num}"),
                 ("HOME", "/home/user"),
                 ("WINEARCH", "win32"),
             ],
@@ -457,6 +507,7 @@ class Game:
             ws_ports,
             container_image=self.cfg.container_image,
             x11_socket=self.cfg.x11_socket,
+            separate_vnc_desktop=self.cfg.separate_vnc_desktop,
         )
         write_file(c, dump(D, Dumper=Dumper))
         base_services = [k for k in D["services"] if k != "game"]
