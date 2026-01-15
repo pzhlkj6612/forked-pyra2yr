@@ -56,6 +56,9 @@ cncnet5.dll
 CnCNet-Spawner.dll
 cncnet.mix
 gamemd.exe
+Phobos.dll
+Ares.dll
+ares.mix
 {NAME_SPAWNER}\
 """
 
