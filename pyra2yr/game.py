@@ -303,6 +303,7 @@ class MultiGameInstanceConfig:
             ("MultiEngineer", S.multi_engineer),
             ("BridgeDestory", S.bridges_destroyable),
             ("BuildOffAlly", S.build_off_ally),
+            ("AutoSaveInterval", 0),
         ]
 
         main_section_values.extend(self.player_values(player))
